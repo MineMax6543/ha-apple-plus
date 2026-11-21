@@ -1,0 +1,71 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Add Apple TV or HomePod",
+        "description": "Enter the IP address of the device, or leave it empty to search the network.",
+        "data": { "host": "IP address (optional)" }
+      },
+      "pick": {
+        "title": "Choose a device",
+        "data": { "device": "Device" }
+      },
+      "confirm": {
+        "title": "Add {name}?",
+        "description": "Found **{name}** ({model}). Continue to pair it with Home Assistant."
+      },
+      "password": {
+        "title": "AirPlay password",
+        "description": "{protocol} on this device is password protected.",
+        "data": { "password": "Password" }
+      },
+      "pair": {
+        "title": "Pair {protocol}",
+        "description": "Enter the PIN that **{name}** is showing now for **{protocol}**.\n\nOptional step: {optional}. Leave the PIN empty to skip an optional step (some features, such as playing URLs or power control, may then be missing).",
+        "data": { "pin": "PIN" }
+      },
+      "pair_no_pin": {
+        "title": "Pair {protocol}",
+        "description": "Enter the PIN **{pin}** on **{name}**, then press Submit."
+      }
+    },
+    "error": {
+      "cannot_connect": "No Apple TV or HomePod answered at this address.",
+      "no_devices_found": "No Apple TV or HomePod found on the network. Try entering its IP address.",
+      "invalid_pin": "The PIN was wrong. A new PIN is now shown on the device.",
+      "pairing_failed": "Pairing failed. A new PIN is now shown on the device; try again."
+    },
+    "abort": {
+      "already_configured": "This device is already set up.",
+      "cannot_connect": "Could not reach the device.",
+      "pairing_failed": "Pairing failed. Make sure the device is awake and \"Allow access\" for AirPlay is set to \"Everyone on the same network\" or \"Anyone\"."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Media handling",
+        "data": {
+          "video_compat": "Video compatibility",
+          "image_duration": "Image display time",
+          "start_timeout": "Wait for playback start"
+        },
+        "data_description": {
+          "video_compat": "How to handle videos the Apple TV can't play directly (MKV, WebM, AVI, VP9, DTS ...).",
+          "image_duration": "How long an image stays on screen when sent to the Apple TV.",
+          "start_timeout": "Seconds play_media waits so it can report startup errors. Playback continues in the background either way."
+        }
+      }
+    }
+  },
+  "selector": {
+    "video_compat": {
+      "options": {
+        "auto": "Auto: repackage only when needed (recommended)",
+        "direct": "Direct: always send the original URL",
+        "always": "Always repackage through Home Assistant"
+      }
+    }
+  }
+}

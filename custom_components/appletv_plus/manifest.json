@@ -1,0 +1,25 @@
+{
+  "domain": "appletv_plus",
+  "name": "AppleTV Plus",
+  "after_dependencies": ["media_source"],
+  "codeowners": ["@MineMax6543"],
+  "config_flow": true,
+  "dependencies": ["ffmpeg", "http", "zeroconf"],
+  "documentation": "https://github.com/MineMax6543/ha-apple-plus",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/MineMax6543/ha-apple-plus/issues",
+  "loggers": ["pyatv", "srptools"],
+  "requirements": ["pyatv>=0.16.0"],
+  "version": "0.1.0",
+  "zeroconf": [
+    {
+      "type": "_airplay._tcp.local.",
+      "properties": { "model": "appletv*" }
+    },
+    {
+      "type": "_airplay._tcp.local.",
+      "properties": { "model": "audioaccessory*" }
+    }
+  ]
+}

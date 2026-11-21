@@ -1,0 +1,71 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Apple TV oder HomePod hinzufügen",
+        "description": "IP-Adresse des Geräts eingeben oder leer lassen, um das Netzwerk zu durchsuchen.",
+        "data": { "host": "IP-Adresse (optional)" }
+      },
+      "pick": {
+        "title": "Gerät auswählen",
+        "data": { "device": "Gerät" }
+      },
+      "confirm": {
+        "title": "{name} hinzufügen?",
+        "description": "**{name}** ({model}) gefunden. Weiter, um es mit Home Assistant zu koppeln."
+      },
+      "password": {
+        "title": "AirPlay-Passwort",
+        "description": "{protocol} ist auf diesem Gerät mit einem Passwort geschützt.",
+        "data": { "password": "Passwort" }
+      },
+      "pair": {
+        "title": "{protocol} koppeln",
+        "description": "Gib die PIN ein, die **{name}** gerade für **{protocol}** anzeigt.\n\nOptionaler Schritt: {optional}. PIN leer lassen, um einen optionalen Schritt zu überspringen (dann fehlen evtl. Funktionen wie URL-Wiedergabe oder Ein/Aus).",
+        "data": { "pin": "PIN" }
+      },
+      "pair_no_pin": {
+        "title": "{protocol} koppeln",
+        "description": "Gib die PIN **{pin}** auf **{name}** ein und klicke dann auf Absenden."
+      }
+    },
+    "error": {
+      "cannot_connect": "Unter dieser Adresse hat kein Apple TV oder HomePod geantwortet.",
+      "no_devices_found": "Kein Apple TV oder HomePod im Netzwerk gefunden. Versuche es mit der IP-Adresse.",
+      "invalid_pin": "Falsche PIN. Auf dem Gerät wird jetzt eine neue PIN angezeigt.",
+      "pairing_failed": "Kopplung fehlgeschlagen. Auf dem Gerät wird jetzt eine neue PIN angezeigt; versuche es erneut."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits eingerichtet.",
+      "cannot_connect": "Gerät nicht erreichbar.",
+      "pairing_failed": "Kopplung fehlgeschlagen. Stelle sicher, dass das Gerät wach ist und AirPlay-Zugriff auf \"Alle im selben Netzwerk\" oder \"Jeder\" steht."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Medienverarbeitung",
+        "data": {
+          "video_compat": "Video-Kompatibilität",
+          "image_duration": "Anzeigedauer für Bilder",
+          "start_timeout": "Auf Wiedergabestart warten"
+        },
+        "data_description": {
+          "video_compat": "Umgang mit Videos, die das Apple TV nicht direkt abspielen kann (MKV, WebM, AVI, VP9, DTS ...).",
+          "image_duration": "Wie lange ein Bild auf dem Apple TV angezeigt wird.",
+          "start_timeout": "Sekunden, die play_media wartet, um Startfehler zu melden. Die Wiedergabe läuft danach im Hintergrund weiter."
+        }
+      }
+    }
+  },
+  "selector": {
+    "video_compat": {
+      "options": {
+        "auto": "Automatisch: nur bei Bedarf umpacken (empfohlen)",
+        "direct": "Direkt: immer die Original-URL senden",
+        "always": "Immer über Home Assistant umpacken"
+      }
+    }
+  }
+}
