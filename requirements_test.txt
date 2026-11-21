@@ -1,2 +1,6 @@
 pytest-homeassistant-custom-component
 pyatv>=0.16.0
+# deps of HA components this integration depends on (ffmpeg, http)
+ha-ffmpeg
+aiohttp_cors
+PyTurboJPEG
