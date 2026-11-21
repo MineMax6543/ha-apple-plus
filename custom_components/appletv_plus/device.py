@@ -58,6 +58,10 @@ from .media import MediaManager, PreparedMedia
 
 _LOGGER = logging.getLogger(__name__)
 
+AIRPLAY_PLAYER_BUNDLE = "com.apple.TVAirPlay"
+# How long the Apple TV may take to show the AirPlay player after /play.
+AIRPLAY_START_GRACE = 20
+
 HOMEPOD_MODELS = {
     DeviceModel.HomePod,
     DeviceModel.HomePodMini,
@@ -392,6 +396,46 @@ class AppleDevice(PushListener, DeviceListener, PowerListener, AudioListener):
         if self._prepared is not None:
             await self.media.async_release(self._prepared)
             self._prepared = None
+
+    def _airplay_player_active(self) -> bool | None:
+        """Return whether tvOS' AirPlay player is the active app (None = unknown)."""
+        if self.atv is None:
+            return False
+        try:
+            app = self.atv.metadata.app
+        except Exception:  # noqa: BLE001 - not supported without MRP
+            return None
+        return app is not None and app.identifier == AIRPLAY_PLAYER_BUNDLE
+
+    async def async_wait_airplay_session(self, max_seconds: float | None) -> None:
+        """Block while the Apple TV is showing our AirPlay stream.
+
+        Used when tvOS refuses `/playback-info` (403). Ends when the AirPlay
+        player stops being the active app, or after `max_seconds` (+ margin).
+        """
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        started = False
+        inactive = 0
+        while True:
+            await asyncio.sleep(1)
+            elapsed = loop.time() - start
+            if max_seconds and elapsed > max_seconds + 10:
+                return
+            active = self._airplay_player_active()
+            if active is None:
+                continue
+            if active:
+                started, inactive = True, 0
+                continue
+            inactive += 1
+            if started and inactive >= 3:
+                _LOGGER.debug("AirPlay player closed on %s; playback ended", self.name)
+                return
+            if not started and elapsed > AIRPLAY_START_GRACE:
+                raise HomeAssistantError(
+                    f"{self.name} accepted the stream but never started playing it"
+                )
 
     async def async_run(self, command: Callable[[AppleTV], Awaitable[Any]]) -> Any:
         """Run a pyatv command (given as `lambda atv: ...`) and translate errors."""

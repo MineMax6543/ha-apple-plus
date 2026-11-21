@@ -12,6 +12,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
+from . import airplay_patch
 from .const import CONF_DEVICE_KIND, DOMAIN, KIND_APPLE_TV
 from .device import AppleDevice
 from .media import MediaManager, MediaView
@@ -24,7 +25,8 @@ type AppleConfigEntry = ConfigEntry[AppleDevice]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up shared pieces (media server view)."""
+    """Set up shared pieces (media server view, pyatv workaround)."""
+    airplay_patch.install()
     manager = MediaManager(hass, get_ffmpeg_manager(hass).binary)
     hass.data[DOMAIN] = manager
     hass.http.register_view(MediaView(manager))

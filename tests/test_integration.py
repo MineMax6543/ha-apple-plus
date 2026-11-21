@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import shutil
 import subprocess
+import sys
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -222,34 +223,50 @@ async def test_playback_error_is_reported(hass: HomeAssistant, setup_atv) -> Non
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
-async def test_image_becomes_video(
-    hass: HomeAssistant, setup_atv, aioclient_mock, tmp_path
-) -> None:
-    """An image is converted to MP4 and served through the media view."""
+async def test_image_becomes_video(hass: HomeAssistant, setup_atv, tmp_path) -> None:
+    """An image is fetched by ffmpeg, converted to MP4 and served by HA."""
     atv, entry = setup_atv
-    png = tmp_path / "x.png"
+    png = tmp_path / "photo.png"
     subprocess.run(
         ["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x240",
          "-frames:v", "1", str(png)],
         check=True,
     )
-    aioclient_mock.get("http://192.168.1.10/photo.png", content=png.read_bytes())
-
-    await hass.services.async_call(
-        MP_DOMAIN,
-        SERVICE_PLAY_MEDIA,
-        {
-            ATTR_ENTITY_ID: ENTITY,
-            ATTR_MEDIA_CONTENT_ID: "http://192.168.1.10/photo.png",
-            ATTR_MEDIA_CONTENT_TYPE: "image/png",
-            ATTR_MEDIA_EXTRA: {"duration": 3},
-        },
-        blocking=True,
+    # Serve it from a separate process (the test harness blocks sockets here).
+    server = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", SERVE_SCRIPT, str(tmp_path),
+        stdout=asyncio.subprocess.PIPE,
     )
+    try:
+        port = int((await server.stdout.readline()).decode().strip())
+        await hass.services.async_call(
+            MP_DOMAIN,
+            SERVICE_PLAY_MEDIA,
+            {
+                ATTR_ENTITY_ID: ENTITY,
+                ATTR_MEDIA_CONTENT_ID: f"http://127.0.0.1:{port}/photo.png",
+                ATTR_MEDIA_CONTENT_TYPE: "image/png",
+                ATTR_MEDIA_EXTRA: {"duration": 3},
+            },
+            blocking=True,
+        )
+    finally:
+        server.kill()
+        await server.wait()
     url = atv.stream.play_url.call_args.args[0]
     assert url.startswith("http://192.168.1.2:8123/api/appletv_plus/media/")
     assert url.endswith("/image.mp4")
     assert hass.states.get(ENTITY).attributes["delivery"] == "image_as_video"
+
+
+SERVE_SCRIPT = """
+import functools, http.server, sys
+h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=sys.argv[1])
+h.func.log_message = lambda *a: None
+s = http.server.ThreadingHTTPServer(("127.0.0.1", 0), h)
+print(s.server_address[1], flush=True)
+s.serve_forever()
+"""
 
 
 async def test_homepod_rejects_images_and_streams_audio(hass: HomeAssistant) -> None:
@@ -295,3 +312,31 @@ async def test_homepod_rejects_images_and_streams_audio(hass: HomeAssistant) -> 
     assert hass.states.get(ENTITY).attributes["audio_path"] == "airplay_stereo"
     assert hass.states.get("remote.living_room_remote") is None
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_airplay_watcher_follows_tvairplay_app(hass: HomeAssistant, setup_atv) -> None:
+    """The 403 fallback ends once tvOS' AirPlay player is no longer active."""
+    atv, entry = setup_atv
+    airplay = MagicMock(identifier="com.apple.TVAirPlay")
+    music = MagicMock(identifier="com.apple.TVMusic")
+    states = iter([airplay, airplay, music, music, music])
+    type(atv.metadata).app = property(lambda self: next(states, music))
+
+    with patch("custom_components.appletv_plus.device.asyncio.sleep", AsyncMock()):
+        await asyncio.wait_for(entry.runtime_data.async_wait_airplay_session(None), 5)
+
+
+async def test_airplay_watcher_reports_never_started(hass: HomeAssistant, setup_atv) -> None:
+    """If the AirPlay player never shows up, playback is reported as failed."""
+    atv, entry = setup_atv
+    type(atv.metadata).app = property(lambda self: None)
+    from homeassistant.exceptions import HomeAssistantError
+
+    clock = iter(range(0, 1000, 5))
+    loop = asyncio.get_running_loop()
+    with (
+        patch("custom_components.appletv_plus.device.asyncio.sleep", AsyncMock()),
+        patch.object(loop, "time", lambda: next(clock)),
+        pytest.raises(HomeAssistantError, match="never started"),
+    ):
+        await entry.runtime_data.async_wait_airplay_session(None)

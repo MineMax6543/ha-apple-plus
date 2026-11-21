@@ -36,6 +36,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AppleConfigEntry
+from .airplay_patch import FALLBACK_WAITER
 from .const import (
     AUDIO_PATH_DEVICE,
     AUDIO_PATH_STEREO,
@@ -611,6 +612,7 @@ class AppleMediaPlayer(AppleEntity, MediaPlayerEntity):
         prepared = None
         probe: ProbeResult | None = None
         delivery = "direct"
+        max_seconds: float | None = None
 
         if kind == "image":
             duration = int(
@@ -624,6 +626,7 @@ class AppleMediaPlayer(AppleEntity, MediaPlayerEntity):
             )
             w, h = (3840, 2160) if four_k else (1920, 1080)
             prepared = await media.async_image_to_video(url, duration, w, h)
+            max_seconds = duration
             play_url, delivery = prepared.url, "image_as_video"
         else:
             ext = url_ext(url)
@@ -645,11 +648,20 @@ class AppleMediaPlayer(AppleEntity, MediaPlayerEntity):
             else:
                 play_url = url
 
+        if probe is not None and probe.duration and max_seconds is None:
+            max_seconds = probe.duration - position
         info = self._item_info(url, kind, title, probe, AUDIO_PATH_DEVICE, delivery)
 
         async def job() -> None:
             assert dev.atv is not None
-            await dev.atv.stream.play_url(play_url, position=position)
+            # pyatv copies this context into its play task; see airplay_patch.
+            token = FALLBACK_WAITER.set(
+                lambda: dev.async_wait_airplay_session(max_seconds)
+            )
+            try:
+                await dev.atv.stream.play_url(play_url, position=position)
+            finally:
+                FALLBACK_WAITER.reset(token)
 
         await dev.async_start_playback(job, prepared, info, self._start_timeout)
         if probe is None and kind in ("video", "audio"):

@@ -33,7 +33,6 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import DOMAIN, MEDIA_VIEW_URL
@@ -274,14 +273,21 @@ class MediaManager:
         """Turn an image into a short MP4 the Apple TV can display."""
         item = self._new_item()
         folder = self.item_dir(item.token)
-        ext = url_ext(url) if url_ext(url) in IMAGE_EXTS else ".img"
-        src = folder / f"source{ext}"
+        ext = url_ext(url)
+        net = ["-rw_timeout", "15000000"] if url.startswith(("http://", "https://")) else []
+        src = folder / "source.png"
         try:
-            session = async_get_clientsession(self.hass, verify_ssl=False)
-            async with session.get(url) as resp:
-                resp.raise_for_status()
-                data = await resp.read()
-            await self.hass.async_add_executor_job(src.write_bytes, data)
+            if ext != ".gif":
+                # Let ffmpeg fetch the image and keep only the first frame. This
+                # also works for camera MJPEG streams that never "finish", which
+                # a plain HTTP download would hang on.
+                code, err = await self._run(
+                    ["-y", *net, "-i", url, "-frames:v", "1", str(src)], timeout=30
+                )
+                if code != 0 or not await self.hass.async_add_executor_job(src.exists):
+                    raise HomeAssistantError(
+                        f"Could not fetch image from {url}: {err.strip()[-300:]}"
+                    )
 
             vf = (
                 f"scale=w='min(iw,{max_w})':h='min(ih,{max_h})'"
@@ -289,7 +295,7 @@ class MediaManager:
                 f"pad={max_w}:{max_h}:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p"
             )
             input_args = (
-                ["-ignore_loop", "0", "-i", str(src)]
+                [*net, "-ignore_loop", "0", "-i", url]
                 if ext == ".gif"
                 else ["-loop", "1", "-framerate", "5", "-i", str(src)]
             )
