@@ -20,6 +20,12 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     return
 
 
+@pytest.fixture(autouse=True)
+def auto_mock_zeroconf(mock_async_zeroconf):
+    """Zeroconf is a dependency; don't open real multicast sockets in tests."""
+    return
+
+
 def make_conf(
     name: str = "Living Room",
     model: DeviceModel = DeviceModel.AppleTV4KGen3,
